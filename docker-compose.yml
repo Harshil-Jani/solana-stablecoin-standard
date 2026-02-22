@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - RPC_URL=http://solana-test-validator:8899
+      - API_KEY=${API_KEY:-dev-api-key}
+      - DB_PATH=/app/data/sss.sqlite
+      - PORT=3001
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      solana-test-validator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  solana-test-validator:
+    image: solanalabs/solana:latest
+    ports:
+      - "8899:8899"
+      - "8900:8900"
+    command: >
+      solana-test-validator
+        --bind-address 0.0.0.0
+        --rpc-port 8899
+        --faucet-port 8900
+        --ledger /var/lib/solana/ledger
+        --limit-ledger-size 50000000
+        --reset
+    volumes:
+      - validator-ledger:/var/lib/solana/ledger
+    healthcheck:
+      test: ["CMD", "solana", "cluster-version", "--url", "http://localhost:8899"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+  validator-ledger:
