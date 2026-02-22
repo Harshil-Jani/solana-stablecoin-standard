@@ -1,0 +1,23 @@
+{
+  "name": "@stbr/sss-sdk",
+  "version": "0.1.0",
+  "description": "Solana Stablecoin Standard SDK — modular toolkit for Token-2022 stablecoins",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "mocha"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "^0.4.10"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "files": [
+    "dist/"
+  ],
+  "license": "MIT"
+}
