@@ -32,6 +32,8 @@ pub struct BurnTokens<'info> {
     #[account(mut)]
     pub burner_token_account: AccountInfo<'info>,
 
+    /// CHECK: Must be the Token-2022 program — prevents CPI redirection attacks
+    #[account(address = spl_token_2022::ID)]
     pub token_program: AccountInfo<'info>,
 }
 

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
-use anchor_lang::solana_program::program_pack::Pack;
 use spl_token_2022::{
+    extension::StateWithExtensions,
     instruction as token_instruction,
     state::Account as SplAccount,
 };
@@ -38,6 +38,8 @@ pub struct Seize<'info> {
     #[account(mut)]
     pub destination_token_account: AccountInfo<'info>,
 
+    /// CHECK: Must be the Token-2022 program — prevents CPI redirection attacks
+    #[account(address = spl_token_2022::ID)]
     pub token_program: AccountInfo<'info>,
 }
 
@@ -49,10 +51,13 @@ pub fn handler(ctx: Context<Seize>) -> Result<()> {
     );
     require!(ctx.accounts.role.roles.is_seizer, StablecoinError::Unauthorized);
 
-    // Read full balance from source token account
+    // Read full balance from source token account.
+    // Must use StateWithExtensions (not Pack::unpack) because Token-2022 accounts
+    // carry TLV extension data beyond the base 165-byte layout, and Pack::unpack
+    // enforces a strict length == 165 check that always fails on Token-2022 accounts.
     let source_data = ctx.accounts.source_token_account.try_borrow_data()?;
-    let source_account = SplAccount::unpack(&source_data)?;
-    let amount = source_account.amount;
+    let source_account = StateWithExtensions::<SplAccount>::unpack(&source_data)?;
+    let amount = source_account.base.amount;
     drop(source_data);
 
     require!(amount > 0, StablecoinError::ZeroAmount);

@@ -117,7 +117,7 @@ pub mod sss_transfer_hook {
     }
 
     /// Fallback handler — Token-2022 CPIs here on every transfer.
-    /// Verifies the Execute discriminator and checks blacklist status.
+    /// Verifies the Execute discriminator, checks pause status, and checks blacklist.
     pub fn fallback<'info>(
         _program_id: &Pubkey,
         accounts: &'info [AccountInfo<'info>],
@@ -135,6 +135,16 @@ pub mod sss_transfer_hook {
         // Accounts layout:
         // [0] source, [1] mint, [2] dest, [3] authority, [4] extra_meta_list
         // [5] sss-token program, [6] stablecoin state, [7] source blacklist, [8] dest blacklist
+
+        // Check pause: read the `paused` flag from the stablecoin state PDA.
+        // The flag is embedded in a Borsh-serialized struct with variable-length
+        // strings, so we must walk the layout dynamically to find it.
+        if accounts.len() > 6 {
+            let stablecoin_data = accounts[6].try_borrow_data()?;
+            if read_paused_flag(&stablecoin_data) {
+                return Err(HookError::Paused.into());
+            }
+        }
 
         // Check blacklist: if the PDA account has data, the address is blacklisted
         if accounts.len() > 7 {
@@ -154,6 +164,45 @@ pub mod sss_transfer_hook {
         // Transfer allowed
         Ok(())
     }
+}
+
+/// Read the `paused` flag from a Borsh-serialized StablecoinState account.
+///
+/// Layout:
+///   8  bytes — Anchor discriminator
+///   32 bytes — authority (Pubkey)
+///   32 bytes — mint (Pubkey)
+///   4 + N    — name (String: 4-byte LE length prefix + UTF-8 bytes)
+///   4 + N    — symbol (String)
+///   4 + N    — uri (String)
+///   1  byte  — decimals
+///   1  byte  — enable_permanent_delegate
+///   1  byte  — enable_transfer_hook
+///   1  byte  — default_account_frozen
+///   1  byte  — paused  ← this is what we read
+fn read_paused_flag(data: &[u8]) -> bool {
+    // Skip discriminator + authority + mint
+    let mut offset: usize = 8 + 32 + 32; // 72
+
+    // Skip three variable-length Borsh strings (name, symbol, uri)
+    for _ in 0..3 {
+        if data.len() < offset + 4 {
+            return false;
+        }
+        let str_len = u32::from_le_bytes(
+            data[offset..offset + 4].try_into().unwrap_or([0; 4]),
+        ) as usize;
+        offset += 4 + str_len;
+    }
+
+    // Skip decimals(1) + enable_permanent_delegate(1) + enable_transfer_hook(1) + default_account_frozen(1)
+    offset += 4;
+
+    // Read the paused byte
+    if data.len() <= offset {
+        return false;
+    }
+    data[offset] != 0
 }
 
 #[derive(Accounts)]

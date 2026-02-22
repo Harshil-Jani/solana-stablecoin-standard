@@ -1,5 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { insertEvent } from "../db/schema";
+import type { WebhookService } from "./webhook";
 
 const PROGRAM_ID = new PublicKey("2D8s3bH6vD3LG7wqzvpSvYFysYoSK4wwggHCptaKFJJQ");
 
@@ -8,7 +9,8 @@ export class EventListener {
 
   constructor(
     private connection: Connection,
-    private logger: { info: (...args: unknown[]) => void; error: (...args: unknown[]) => void }
+    private logger: { info: (...args: unknown[]) => void; error: (...args: unknown[]) => void },
+    private webhookService?: WebhookService,
   ) {}
 
   start(): void {
@@ -45,15 +47,23 @@ export class EventListener {
       const eventType = this.detectEventType(logInfo.logs);
 
       if (eventType) {
+        const payload = { raw: base64Data, logs: logInfo.logs };
         insertEvent(
           eventType,
           PROGRAM_ID.toBase58(),
-          { raw: base64Data, logs: logInfo.logs },
+          payload,
           logInfo.signature,
           0,
           Math.floor(Date.now() / 1000)
         );
         this.logger.info(`Event captured: ${eventType} (${logInfo.signature})`);
+
+        // Dispatch to registered webhooks
+        if (this.webhookService) {
+          this.webhookService
+            .dispatch(eventType, { ...payload, signature: logInfo.signature })
+            .catch((err) => this.logger.error("Webhook dispatch error:", err));
+        }
       }
     }
   }

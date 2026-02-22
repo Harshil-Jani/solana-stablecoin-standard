@@ -55,7 +55,8 @@ pub struct InitializeStablecoin<'info> {
     /// CHECK: Transfer hook program (pass system program ID if not using hooks)
     pub transfer_hook_program: AccountInfo<'info>,
 
-    /// CHECK: Token-2022 program
+    /// CHECK: Must be the Token-2022 program — prevents CPI redirection attacks
+    #[account(address = spl_token_2022::ID)]
     pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,

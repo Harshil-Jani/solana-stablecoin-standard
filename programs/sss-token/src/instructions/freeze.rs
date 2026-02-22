@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
+use spl_token_2022;
 use spl_token_2022::instruction as token_instruction;
 
 use crate::state::*;
@@ -30,6 +31,8 @@ pub struct FreezeTokenAccount<'info> {
     #[account(mut)]
     pub target_token_account: AccountInfo<'info>,
 
+    /// CHECK: Must be the Token-2022 program — prevents CPI redirection attacks
+    #[account(address = spl_token_2022::ID)]
     pub token_program: AccountInfo<'info>,
 }
 
@@ -56,6 +59,8 @@ pub struct ThawTokenAccount<'info> {
     #[account(mut)]
     pub target_token_account: AccountInfo<'info>,
 
+    /// CHECK: Must be the Token-2022 program — prevents CPI redirection attacks
+    #[account(address = spl_token_2022::ID)]
     pub token_program: AccountInfo<'info>,
 }
 

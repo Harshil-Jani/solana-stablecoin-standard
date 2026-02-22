@@ -23,7 +23,7 @@ logger.info("SQLite database initialized");
 
 // Services
 const webhookService = new WebhookService(logger);
-const eventListener = new EventListener(connection, logger);
+const eventListener = new EventListener(connection, logger, webhookService);
 
 // Express app
 const app = express();
