@@ -1,7 +1,15 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke_signed;
+use anchor_lang::solana_program::program_pack::Pack;
+use spl_token_2022::{
+    instruction as token_instruction,
+    state::Account as SplAccount,
+};
 
 use crate::state::*;
 use crate::constants::*;
+use crate::error::StablecoinError;
+use crate::events::TokensSeized;
 
 #[derive(Accounts)]
 pub struct Seize<'info> {
@@ -33,7 +41,58 @@ pub struct Seize<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-pub fn handler(_ctx: Context<Seize>) -> Result<()> {
-    // TODO: Implement in Commit 8
+pub fn handler(ctx: Context<Seize>) -> Result<()> {
+    // Feature gate: only SSS-2 tokens support seizure
+    require!(
+        ctx.accounts.stablecoin.enable_permanent_delegate,
+        StablecoinError::ComplianceNotEnabled
+    );
+    require!(ctx.accounts.role.roles.is_seizer, StablecoinError::Unauthorized);
+
+    // Read full balance from source token account
+    let source_data = ctx.accounts.source_token_account.try_borrow_data()?;
+    let source_account = SplAccount::unpack(&source_data)?;
+    let amount = source_account.amount;
+    drop(source_data);
+
+    require!(amount > 0, StablecoinError::ZeroAmount);
+
+    // CPI: transfer_checked using permanent delegate authority (stablecoin PDA)
+    let mint_key = ctx.accounts.mint.key();
+    let signer_seeds: &[&[u8]] = &[
+        STABLECOIN_SEED,
+        mint_key.as_ref(),
+        &[ctx.accounts.stablecoin.bump],
+    ];
+
+    invoke_signed(
+        &token_instruction::transfer_checked(
+            &ctx.accounts.token_program.key(),
+            &ctx.accounts.source_token_account.key(),
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.destination_token_account.key(),
+            &ctx.accounts.stablecoin.key(), // permanent delegate
+            &[],
+            amount,
+            ctx.accounts.stablecoin.decimals,
+        )?,
+        &[
+            ctx.accounts.source_token_account.to_account_info(),
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.destination_token_account.to_account_info(),
+            ctx.accounts.stablecoin.to_account_info(),
+        ],
+        &[signer_seeds],
+    )?;
+
+    emit!(TokensSeized {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        from: ctx.accounts.source_token_account.key(),
+        to: ctx.accounts.destination_token_account.key(),
+        amount,
+        seized_by: ctx.accounts.seizer.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     Ok(())
 }

@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::state::*;
 use crate::constants::*;
+use crate::error::StablecoinError;
+use crate::events::{AddedToBlacklist, RemovedFromBlacklist};
 
 #[derive(Accounts)]
 pub struct AddToBlacklist<'info> {
@@ -64,12 +66,43 @@ pub struct RemoveFromBlacklist<'info> {
     pub address: AccountInfo<'info>,
 }
 
-pub fn add_handler(_ctx: Context<AddToBlacklist>, _reason: String) -> Result<()> {
-    // TODO: Implement in Commit 8
+pub fn add_handler(ctx: Context<AddToBlacklist>, reason: String) -> Result<()> {
+    // Feature gate: only SSS-2 tokens support blacklisting
+    require!(ctx.accounts.stablecoin.is_sss2(), StablecoinError::ComplianceNotEnabled);
+    require!(ctx.accounts.role.roles.is_blacklister, StablecoinError::Unauthorized);
+    require!(reason.len() <= MAX_REASON_LEN, StablecoinError::ReasonTooLong);
+
+    let entry = &mut ctx.accounts.blacklist_entry;
+    entry.stablecoin = ctx.accounts.stablecoin.key();
+    entry.address = ctx.accounts.address.key();
+    entry.reason = reason.clone();
+    entry.blacklisted_at = Clock::get()?.unix_timestamp;
+    entry.blacklisted_by = ctx.accounts.blacklister.key();
+    entry.bump = ctx.bumps.blacklist_entry;
+
+    emit!(AddedToBlacklist {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        address: ctx.accounts.address.key(),
+        reason,
+        blacklisted_by: ctx.accounts.blacklister.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     Ok(())
 }
 
-pub fn remove_handler(_ctx: Context<RemoveFromBlacklist>) -> Result<()> {
-    // TODO: Implement in Commit 8
+pub fn remove_handler(ctx: Context<RemoveFromBlacklist>) -> Result<()> {
+    // Feature gate
+    require!(ctx.accounts.stablecoin.is_sss2(), StablecoinError::ComplianceNotEnabled);
+    require!(ctx.accounts.role.roles.is_blacklister, StablecoinError::Unauthorized);
+
+    emit!(RemovedFromBlacklist {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        address: ctx.accounts.address.key(),
+        removed_by: ctx.accounts.blacklister.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    // Account is closed via Anchor's `close = blacklister` constraint
     Ok(())
 }
