@@ -2,6 +2,14 @@
 
 A modular, production-ready SDK for building stablecoins on Solana using Token-2022 extensions.
 
+## Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="SSS Live Demo — 6 on-chain operations against localnet" width="720" />
+</p>
+
+> **6 live operations on localnet:** SSS-1 creation, role management, pause/unpause, authority transfer, SSS-2 compliant stablecoin, and blacklist enforcement.
+
 ## Architecture
 
 Three-layer design:
