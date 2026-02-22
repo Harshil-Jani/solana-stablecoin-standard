@@ -24,15 +24,15 @@ SSS-1 is the lightweight preset for issuing basic stablecoins on Solana. It prov
 
 ## Lifecycle
 
-```
-1. Initialize (creates mint + StablecoinState + authority roles)
-2. Assign roles (minter, burner, pauser)
-3. Set minter quotas
-4. Mint tokens to recipients
-5. Normal token transfers (standard Token-2022, no hook)
-6. Burn tokens (burner burns from own account)
-7. Freeze/thaw accounts as needed
-8. Pause if emergency occurs
+```mermaid
+flowchart LR
+    A["Initialize<br/>mint + state + roles"] --> B["Assign Roles<br/>minter · burner · pauser"]
+    B --> C["Set Quotas"]
+    C --> D["Mint Tokens"]
+    D --> E["Transfer<br/>(standard Token-2022)"]
+    E --> F["Burn Tokens"]
+    F --> G["Freeze / Thaw<br/>as needed"]
+    G --> H["Pause<br/>if emergency"]
 ```
 
 ## Configuration

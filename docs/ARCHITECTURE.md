@@ -9,23 +9,16 @@ The Solana Stablecoin Standard (SSS) is a modular framework for issuing regulate
 
 ## System Components
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Admin CLI / SDK                        │
-│  sss-token init | mint | burn | freeze | pause | status  │
-└────────────────────────┬────────────────────────────────┘
-                         │ TransactionInstruction
-┌────────────────────────▼────────────────────────────────┐
-│              sss-token Program (Anchor)                   │
-│  13 instructions, 4 PDA account types, 6 roles           │
-│  Seeds: stablecoin, role, minter, blacklist               │
-└────────────┬───────────────────────────────┬────────────┘
-             │ CPI                           │ Transfer Hook
-┌────────────▼────────────┐    ┌─────────────▼────────────┐
-│   Token-2022 Program     │    │  sss-transfer-hook        │
-│   MintTo, Burn, Freeze   │    │  Blacklist check on       │
-│   TransferChecked        │    │  every transfer (SSS-2)   │
-└──────────────────────────┘    └──────────────────────────┘
+```mermaid
+flowchart TD
+    CLI["<b>Admin CLI / SDK</b><br/>sss-token init | mint | burn | freeze | pause | status"]
+    TOKEN["<b>sss-token Program</b> (Anchor)<br/>13 instructions · 4 PDA types · 6 roles<br/>Seeds: stablecoin, role, minter, blacklist"]
+    T22["<b>Token-2022 Program</b><br/>MintTo · Burn · Freeze<br/>TransferChecked"]
+    HOOK["<b>sss-transfer-hook</b><br/>Blacklist check on<br/>every transfer (SSS-2)"]
+
+    CLI -- "TransactionInstruction" --> TOKEN
+    TOKEN -- "CPI" --> T22
+    TOKEN -- "Transfer Hook" --> HOOK
 ```
 
 ## PDA Account Layout
@@ -61,11 +54,23 @@ SSS-2 instructions check `stablecoin.is_sss2()` (both `enable_permanent_delegate
 
 ## Transfer Hook Flow
 
-```
-User calls transfer_checked
-  → Token-2022 resolves ExtraAccountMetaList PDA
-  → Passes extra accounts to sss-transfer-hook::fallback
-  → Hook checks source + destination blacklist PDAs
-  → If either has data → reject (Blacklisted error)
-  → Otherwise → transfer proceeds
+```mermaid
+sequenceDiagram
+    participant User
+    participant Token2022 as Token-2022
+    participant Hook as sss-transfer-hook
+    participant Blacklist as Blacklist PDAs
+
+    User->>Token2022: transfer_checked()
+    Token2022->>Token2022: Resolve ExtraAccountMetaList PDA
+    Token2022->>Hook: fallback() with extra accounts
+    Hook->>Blacklist: Check source blacklist PDA
+    Hook->>Blacklist: Check destination blacklist PDA
+    alt Either is blacklisted
+        Hook-->>Token2022: Error: Blacklisted
+        Token2022-->>User: Transaction fails
+    else Neither blacklisted
+        Hook-->>Token2022: OK
+        Token2022-->>User: Transfer succeeds
+    end
 ```

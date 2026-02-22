@@ -29,13 +29,21 @@ Each blacklisted address gets its own PDA:
 
 ## Seizure Flow
 
-```
-1. Seizer calls `seize` instruction
-2. Program reads source token account balance via Pack::unpack
-3. Program calls transfer_checked via invoke_signed
-4. Uses stablecoin PDA as permanent delegate authority
-5. Full balance transferred to destination (treasury)
-6. TokensSeized event emitted
+```mermaid
+sequenceDiagram
+    participant Seizer
+    participant Program as sss-token Program
+    participant Source as Source Token Account
+    participant Treasury as Treasury Account
+    participant Token2022 as Token-2022
+
+    Seizer->>Program: seize()
+    Program->>Source: Pack::unpack() — read balance
+    Program->>Token2022: transfer_checked via invoke_signed
+    Note over Program,Token2022: Stablecoin PDA signs as<br/>permanent delegate authority
+    Token2022->>Source: Debit full balance
+    Token2022->>Treasury: Credit full balance
+    Program-->>Seizer: TokensSeized event emitted
 ```
 
 ## KYC Gate

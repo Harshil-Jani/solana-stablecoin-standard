@@ -54,13 +54,20 @@ The Express.js backend provides:
 
 ## Compliance Workflow
 
-```
-1. Deploy SSS-2 stablecoin with --sss2 flag
-2. Assign compliance roles (blacklister, seizer, pauser)
-3. User requests account → account created (frozen by default)
-4. KYC team verifies user → pauser thaws account
-5. Ongoing: transfer hook blocks blacklisted addresses
-6. Sanctions match → blacklister adds to blacklist
-7. Court order → seizer transfers assets to treasury
-8. Emergency → pauser halts all minting/burning
+```mermaid
+flowchart TD
+    A["1. Deploy SSS-2 stablecoin<br/><code>sss-token init --sss2</code>"] --> B
+    B["2. Assign compliance roles<br/>blacklister · seizer · pauser"] --> C
+    C["3. User requests account<br/>Account created <b>frozen by default</b>"] --> D
+    D{"4. KYC verification"}
+    D -- "Approved" --> E["Pauser thaws account<br/>User can transact"]
+    D -- "Rejected" --> F["Account stays frozen"]
+    E --> G["5. Ongoing: transfer hook<br/>blocks blacklisted addresses"]
+    G --> H{"Sanctions match?"}
+    H -- "Yes" --> I["6. Blacklister adds to blacklist<br/>All transfers blocked"]
+    I --> J{"Court order?"}
+    J -- "Yes" --> K["7. Seizer transfers assets<br/>to treasury"]
+    H -- "No" --> L["Normal operations continue"]
+    G --> M{"Emergency?"}
+    M -- "Yes" --> N["8. Pauser halts all<br/>minting and burning"]
 ```
