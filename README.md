@@ -171,6 +171,17 @@ docs/                       # Documentation (7 guides)
 | Blacklister | Add/remove from blacklist | SSS-2 |
 | Seizer | Seize tokens via permanent delegate | SSS-2 |
 
+## Examples
+
+10 step-by-step examples from "hello world" to full compliance lifecycle:
+
+```bash
+npx tsx examples/1-basic-sss1.ts          # Your first stablecoin
+npx tsx examples/10-full-lifecycle.ts      # Complete end-to-end scenario
+```
+
+See [examples/README.md](examples/README.md) for the full list.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — Layer model, data flows, security
@@ -180,6 +191,7 @@ docs/                       # Documentation (7 guides)
 - [SSS-2 Spec](docs/SSS-2.md) — Compliant stablecoin standard
 - [Compliance](docs/COMPLIANCE.md) — Regulatory considerations, audit trail
 - [API Reference](docs/API.md) — Backend API endpoints
+- [Examples](examples/README.md) — 10 hands-on SDK examples
 
 ## License
 
