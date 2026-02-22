@@ -1,12 +1,19 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program::System;
+use anchor_lang::solana_program::program::invoke_signed;
+use spl_transfer_hook_interface::instruction::ExecuteInstruction;
+use spl_tlv_account_resolution::{
+    account::ExtraAccountMeta,
+    seeds::Seed,
+    state::ExtraAccountMetaList,
+};
+use spl_discriminator::discriminator::SplDiscriminate;
 
 pub mod error;
+use error::HookError;
 
 declare_id!("F2of7agMFET8v3verXe3e6Hmfd71t833RjPxEjs5wRdd");
 
-/// Seed for the ExtraAccountMetaList PDA (stores which extra accounts Token-2022
-/// must pass to the hook on every transfer).
 pub const EXTRA_ACCOUNT_METAS_SEED: &[u8] = b"extra-account-metas";
 
 #[program]
@@ -14,38 +21,137 @@ pub mod sss_transfer_hook {
     use super::*;
 
     /// Initialize the ExtraAccountMetaList PDA.
-    /// Called once after creating a mint with a transfer hook extension.
-    /// Tells Token-2022 which extra accounts to include on every transfer CPI.
+    /// Defines which extra accounts Token-2022 must include on every transfer CPI.
+    ///
+    /// Extra account layout (Execute instruction accounts):
+    ///   [0] source token account
+    ///   [1] mint
+    ///   [2] destination token account
+    ///   [3] authority (source wallet owner)
+    ///   [4] ExtraAccountMetaList PDA
+    ///   --- extra accounts ---
+    ///   [5] sss-token program ID (for PDA derivation)
+    ///   [6] stablecoin state PDA: seeds=[b"stablecoin", mint(1)] under program(5)
+    ///   [7] source blacklist PDA: seeds=[b"blacklist", stablecoin(6), authority(3)] under program(5)
+    ///   [8] dest blacklist PDA:   seeds=[b"blacklist", stablecoin(6), dest_owner_from_data(2,32,32)] under program(5)
     pub fn initialize_extra_account_meta_list(
-        _ctx: Context<InitializeExtraAccountMetas>,
-        _stablecoin: Pubkey,
+        ctx: Context<InitializeExtraAccountMetas>,
+        sss_token_program_id: Pubkey,
     ) -> Result<()> {
-        // TODO: Implement in Commit 9
-        // Will populate ExtraAccountMetaList with:
-        // 1. Stablecoin state PDA (to check paused flag)
-        // 2. Source wallet blacklist entry PDA (dynamic, derived from source)
-        // 3. Destination wallet blacklist entry PDA (dynamic, derived from dest)
-        // 4. The sss-token program ID (for PDA derivation)
+        // Order matters: each account can only reference earlier accounts.
+        let extra_account_metas = vec![
+            // [5] sss-token program ID (literal, no dependencies)
+            ExtraAccountMeta::new_with_pubkey(&sss_token_program_id, false, false)?,
+
+            // [6] Stablecoin state PDA: seeds=[b"stablecoin", mint_key]
+            //     External PDA owned by sss-token program (index 5)
+            ExtraAccountMeta::new_external_pda_with_seeds(
+                5, // program at index 5
+                &[
+                    Seed::Literal { bytes: b"stablecoin".to_vec() },
+                    Seed::AccountKey { index: 1 }, // mint
+                ],
+                false,
+                false,
+            )?,
+
+            // [7] Source blacklist entry PDA: seeds=[b"blacklist", stablecoin_key, source_authority]
+            //     May or may not exist; if it does, source is blacklisted
+            ExtraAccountMeta::new_external_pda_with_seeds(
+                5,
+                &[
+                    Seed::Literal { bytes: b"blacklist".to_vec() },
+                    Seed::AccountKey { index: 6 }, // stablecoin state
+                    Seed::AccountKey { index: 3 }, // authority (source wallet)
+                ],
+                false,
+                false,
+            )?,
+
+            // [8] Destination blacklist entry PDA: seeds=[b"blacklist", stablecoin_key, dest_owner]
+            //     dest_owner extracted from destination token account data bytes 32..64
+            ExtraAccountMeta::new_external_pda_with_seeds(
+                5,
+                &[
+                    Seed::Literal { bytes: b"blacklist".to_vec() },
+                    Seed::AccountKey { index: 6 }, // stablecoin state
+                    Seed::AccountData { account_index: 2, data_index: 32, length: 32 }, // dest owner
+                ],
+                false,
+                false,
+            )?,
+        ];
+
+        // Calculate required account size
+        let account_size = ExtraAccountMetaList::size_of(extra_account_metas.len())?;
+        let lamports = Rent::get()?.minimum_balance(account_size);
+
+        // Derive PDA bump for signing
+        let mint_key = ctx.accounts.mint.key();
+        let (_, bump) = Pubkey::find_program_address(
+            &[EXTRA_ACCOUNT_METAS_SEED, mint_key.as_ref()],
+            &crate::ID,
+        );
+
+        // Create the ExtraAccountMetaList account (PDA must sign)
+        invoke_signed(
+            &anchor_lang::solana_program::system_instruction::create_account(
+                &ctx.accounts.authority.key(),
+                &ctx.accounts.extra_account_meta_list.key(),
+                lamports,
+                account_size as u64,
+                &crate::ID,
+            ),
+            &[
+                ctx.accounts.authority.to_account_info(),
+                ctx.accounts.extra_account_meta_list.to_account_info(),
+            ],
+            &[&[EXTRA_ACCOUNT_METAS_SEED, mint_key.as_ref(), &[bump]]],
+        )?;
+
+        // Initialize the ExtraAccountMetaList with our account definitions
+        let mut data = ctx.accounts.extra_account_meta_list.try_borrow_mut_data()?;
+        ExtraAccountMetaList::init::<ExecuteInstruction>(&mut data, &extra_account_metas)?;
+
         Ok(())
     }
 
-    /// Fallback instruction handler — catches the SPL Transfer Hook `Execute`
-    /// instruction that Token-2022 CPIs on every transfer.
-    ///
-    /// Discriminator: [105, 37, 101, 197, 75, 251, 102, 26]
+    /// Fallback handler — Token-2022 CPIs here on every transfer.
+    /// Verifies the Execute discriminator and checks blacklist status.
     pub fn fallback<'info>(
         _program_id: &Pubkey,
-        _accounts: &'info [AccountInfo<'info>],
-        _data: &[u8],
+        accounts: &'info [AccountInfo<'info>],
+        data: &[u8],
     ) -> Result<()> {
-        // TODO: Implement in Commit 9
-        // Will:
-        // 1. Verify instruction discriminator matches Execute
-        // 2. Deserialize accounts (source, mint, dest, owner, extra_meta_list, ...)
-        // 3. Check if stablecoin is paused → deny if so
-        // 4. Check source blacklist PDA → deny if account exists
-        // 5. Check destination blacklist PDA → deny if account exists
-        // 6. Return Ok(()) to allow transfer
+        // Verify Execute instruction discriminator
+        if data.len() < 8 {
+            return Err(HookError::InvalidInstruction.into());
+        }
+        let discriminator = &data[..8];
+        if discriminator != ExecuteInstruction::SPL_DISCRIMINATOR_SLICE {
+            return Err(HookError::InvalidInstruction.into());
+        }
+
+        // Accounts layout:
+        // [0] source, [1] mint, [2] dest, [3] authority, [4] extra_meta_list
+        // [5] sss-token program, [6] stablecoin state, [7] source blacklist, [8] dest blacklist
+
+        // Check blacklist: if the PDA account has data, the address is blacklisted
+        if accounts.len() > 7 {
+            let source_blacklist = &accounts[7];
+            if source_blacklist.data_len() > 0 && **source_blacklist.try_borrow_lamports()? > 0 {
+                return Err(HookError::Blacklisted.into());
+            }
+        }
+
+        if accounts.len() > 8 {
+            let dest_blacklist = &accounts[8];
+            if dest_blacklist.data_len() > 0 && **dest_blacklist.try_borrow_lamports()? > 0 {
+                return Err(HookError::Blacklisted.into());
+            }
+        }
+
+        // Transfer allowed
         Ok(())
     }
 }
@@ -55,7 +161,7 @@ pub struct InitializeExtraAccountMetas<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    /// CHECK: The ExtraAccountMetaList PDA — will be initialized via CPI.
+    /// CHECK: The ExtraAccountMetaList PDA — initialized here.
     /// Seeds: ["extra-account-metas", mint]
     #[account(mut)]
     pub extra_account_meta_list: AccountInfo<'info>,

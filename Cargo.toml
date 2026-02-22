@@ -13,6 +13,7 @@ spl-transfer-hook-interface = "0.6.5"
 spl-tlv-account-resolution = "0.6.5"
 spl-type-length-value = "0.4.6"
 spl-pod = "0.2.5"
+spl-discriminator = "0.2.5"
 
 [profile.release]
 overflow-checks = true
