@@ -80,12 +80,22 @@ pub fn update_roles_handler(ctx: Context<UpdateRoles>, roles: RoleFlags) -> Resu
     Ok(())
 }
 
-pub fn update_minter_handler(ctx: Context<UpdateMinter>, quota: u64) -> Result<()> {
+pub fn update_minter_handler(ctx: Context<UpdateMinter>, quota: u64, epoch_duration: Option<i64>) -> Result<()> {
     let minter_info = &mut ctx.accounts.minter_info;
     minter_info.stablecoin = ctx.accounts.stablecoin.key();
     minter_info.minter = ctx.accounts.minter.key();
     minter_info.quota = quota;
     // Preserve existing minted_amount (don't reset on quota update)
+
+    // If epoch_duration is provided and positive, enable epoch-based quotas
+    if let Some(dur) = epoch_duration {
+        if dur > 0 {
+            minter_info.epoch_duration = dur;
+            minter_info.epoch_start = Clock::get()?.unix_timestamp;
+            minter_info.minted_this_epoch = 0;
+        }
+    }
+
     minter_info.bump = ctx.bumps.minter_info;
 
     emit!(MinterUpdated {

@@ -77,12 +77,15 @@ export interface InitializeParams {
   enablePermanentDelegate: boolean;
   enableTransferHook: boolean;
   defaultAccountFrozen: boolean;
+  maxSupply?: bigint;
 }
 
 export function serializeInitializeParams(params: InitializeParams): Buffer {
   const nameBytes = Buffer.from(params.name, "utf-8");
   const symbolBytes = Buffer.from(params.symbol, "utf-8");
   const uriBytes = Buffer.from(params.uri, "utf-8");
+  const maxSupplyBuf = Buffer.alloc(8);
+  maxSupplyBuf.writeBigUInt64LE(params.maxSupply ?? BigInt(0));
 
   const buffers = [
     // name: String (4-byte length prefix + data)
@@ -102,6 +105,8 @@ export function serializeInitializeParams(params: InitializeParams): Buffer {
     Buffer.from([params.enableTransferHook ? 1 : 0]),
     // default_account_frozen: bool
     Buffer.from([params.defaultAccountFrozen ? 1 : 0]),
+    // max_supply: u64
+    maxSupplyBuf,
   ];
   return Buffer.concat(buffers);
 }
@@ -183,14 +188,26 @@ export function buildUpdateMinterIx(
   stablecoin: PublicKey,
   minterInfo: PublicKey,
   minter: PublicKey,
-  quota: bigint
+  quota: bigint,
+  epochDuration?: bigint
 ): TransactionInstruction {
   const quotaBuf = Buffer.alloc(8);
   quotaBuf.writeBigUInt64LE(quota);
 
+  // Serialize Option<i64>: 1-byte tag + optional 8-byte value
+  let epochBuf: Buffer;
+  if (epochDuration !== undefined) {
+    epochBuf = Buffer.alloc(9);
+    epochBuf[0] = 1; // Some
+    epochBuf.writeBigInt64LE(epochDuration, 1);
+  } else {
+    epochBuf = Buffer.from([0]); // None
+  }
+
   const data = Buffer.concat([
     anchorDiscriminator("update_minter"),
     quotaBuf,
+    epochBuf,
   ]);
 
   return new TransactionInstruction({

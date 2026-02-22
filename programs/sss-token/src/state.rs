@@ -23,6 +23,9 @@ pub struct StablecoinState {
     pub paused: bool,
     pub total_minted: u64,
     pub total_burned: u64,
+    /// Supply cap (0 = uncapped). Placed AFTER total_burned and BEFORE bump
+    /// to avoid breaking the transfer hook's read_paused_flag() byte walker.
+    pub max_supply: u64,
     /// PDA bump
     pub bump: u8,
 }
@@ -41,6 +44,7 @@ impl StablecoinState {
         + 1                     // paused
         + 8                     // total_minted
         + 8                     // total_burned
+        + 8                     // max_supply
         + 1;                    // bump
 
     pub fn is_sss2(&self) -> bool {
@@ -89,8 +93,14 @@ pub struct MinterInfo {
     pub minter: Pubkey,
     /// Maximum amount this minter is allowed to mint
     pub quota: u64,
-    /// Running total of tokens minted by this minter
+    /// Running total of tokens minted by this minter (lifetime)
     pub minted_amount: u64,
+    /// Epoch-based quota auto-reset: 0 = no reset (lifetime). e.g., 86400 for daily.
+    pub epoch_duration: i64,
+    /// Unix timestamp of current epoch start
+    pub epoch_start: i64,
+    /// Running total of tokens minted in the current epoch
+    pub minted_this_epoch: u64,
     pub bump: u8,
 }
 
@@ -100,6 +110,9 @@ impl MinterInfo {
         + 32                    // minter
         + 8                     // quota
         + 8                     // minted_amount
+        + 8                     // epoch_duration
+        + 8                     // epoch_start
+        + 8                     // minted_this_epoch
         + 1;                    // bump
 }
 
@@ -122,5 +135,142 @@ impl BlacklistEntry {
         + (4 + MAX_REASON_LEN)  // reason
         + 8                     // blacklisted_at
         + 32                    // blacklisted_by
+        + 1;                    // bump
+}
+
+/// Multi-sig configuration PDA.
+/// Seeds: [b"multisig", stablecoin.key().as_ref()]
+#[account]
+pub struct MultisigConfig {
+    pub stablecoin: Pubkey,
+    pub signers: Vec<Pubkey>,
+    pub threshold: u8,
+    pub proposal_count: u64,
+    pub bump: u8,
+}
+
+impl MultisigConfig {
+    pub const MAX_SIGNERS: usize = 10;
+    pub const LEN: usize = 8   // discriminator
+        + 32                    // stablecoin
+        + (4 + 32 * Self::MAX_SIGNERS) // signers vec
+        + 1                     // threshold
+        + 8                     // proposal_count
+        + 1;                    // bump
+}
+
+/// Instruction types for multisig proposals and timelocked operations.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum InstructionType {
+    Pause,
+    Unpause,
+    UpdateRoles,
+    UpdateMinter,
+    TransferAuthority,
+    AddToBlacklist,
+    RemoveFromBlacklist,
+    UpdateSupplyCap,
+    ConfigureTransferLimits,
+}
+
+/// Multi-sig proposal PDA.
+/// Seeds: [b"proposal", stablecoin.key().as_ref(), proposal_id.to_le_bytes()]
+#[account]
+pub struct Proposal {
+    pub stablecoin: Pubkey,
+    pub proposal_id: u64,
+    pub proposer: Pubkey,
+    pub instruction_type: InstructionType,
+    pub data: Vec<u8>,
+    pub approvals: Vec<bool>,
+    pub approval_count: u8,
+    pub executed: bool,
+    pub cancelled: bool,
+    pub created_at: i64,
+    pub bump: u8,
+}
+
+impl Proposal {
+    pub const MAX_DATA_LEN: usize = 256;
+    pub const LEN: usize = 8   // discriminator
+        + 32                    // stablecoin
+        + 8                     // proposal_id
+        + 32                    // proposer
+        + 1                     // instruction_type (enum)
+        + (4 + Self::MAX_DATA_LEN) // data vec
+        + (4 + MultisigConfig::MAX_SIGNERS) // approvals vec
+        + 1                     // approval_count
+        + 1                     // executed
+        + 1                     // cancelled
+        + 8                     // created_at
+        + 1;                    // bump
+}
+
+/// Timelock configuration PDA.
+/// Seeds: [b"timelock_config", stablecoin.key().as_ref()]
+#[account]
+pub struct TimelockConfig {
+    pub stablecoin: Pubkey,
+    pub delay: i64,
+    pub enabled: bool,
+    pub bump: u8,
+}
+
+impl TimelockConfig {
+    pub const LEN: usize = 8   // discriminator
+        + 32                    // stablecoin
+        + 8                     // delay
+        + 1                     // enabled
+        + 1;                    // bump
+}
+
+/// Timelock operation PDA.
+/// Seeds: [b"timelock", stablecoin.key().as_ref(), op_id.to_le_bytes()]
+#[account]
+pub struct TimelockOperation {
+    pub stablecoin: Pubkey,
+    pub op_id: u64,
+    pub op_type: InstructionType,
+    pub data: Vec<u8>,
+    pub eta: i64,
+    pub proposer: Pubkey,
+    pub executed: bool,
+    pub cancelled: bool,
+    pub bump: u8,
+}
+
+impl TimelockOperation {
+    pub const MAX_DATA_LEN: usize = 256;
+    pub const LEN: usize = 8   // discriminator
+        + 32                    // stablecoin
+        + 8                     // op_id
+        + 1                     // op_type (enum)
+        + (4 + Self::MAX_DATA_LEN) // data vec
+        + 8                     // eta
+        + 32                    // proposer
+        + 1                     // executed
+        + 1                     // cancelled
+        + 1;                    // bump
+}
+
+/// Transfer limit configuration PDA.
+/// Seeds: [b"transfer_limit", stablecoin.key().as_ref()]
+#[account]
+pub struct TransferLimitConfig {
+    pub stablecoin: Pubkey,
+    pub max_per_tx: u64,
+    pub max_per_day: u64,
+    pub daily_transferred: u64,
+    pub day_start: i64,
+    pub bump: u8,
+}
+
+impl TransferLimitConfig {
+    pub const LEN: usize = 8   // discriminator
+        + 32                    // stablecoin
+        + 8                     // max_per_tx
+        + 8                     // max_per_day
+        + 8                     // daily_transferred
+        + 8                     // day_start
         + 1;                    // bump
 }

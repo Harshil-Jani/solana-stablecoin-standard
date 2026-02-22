@@ -49,13 +49,42 @@ pub fn handler(ctx: Context<MintTokens>, amount: u64) -> Result<()> {
     require!(!ctx.accounts.stablecoin.paused, StablecoinError::Paused);
     require!(ctx.accounts.role.roles.is_minter, StablecoinError::Unauthorized);
 
-    // Enforce per-minter quota
+    // ── Supply cap enforcement (Feature 8) ──────────────────────────
+    let stablecoin = &ctx.accounts.stablecoin;
+    if stablecoin.max_supply > 0 {
+        let circulating = stablecoin
+            .total_minted
+            .checked_sub(stablecoin.total_burned)
+            .ok_or(StablecoinError::MathOverflow)?;
+        let new_circulating = circulating
+            .checked_add(amount)
+            .ok_or(StablecoinError::MathOverflow)?;
+        require!(new_circulating <= stablecoin.max_supply, StablecoinError::SupplyCapExceeded);
+    }
+
+    // ── Epoch-aware per-minter quota enforcement (Feature 7) ────────
     let minter_info = &mut ctx.accounts.minter_info;
-    let new_minted = minter_info
-        .minted_amount
+    let now = Clock::get()?.unix_timestamp;
+
+    // Reset epoch counter if epoch has elapsed
+    if minter_info.epoch_duration > 0
+        && now >= minter_info.epoch_start + minter_info.epoch_duration
+    {
+        minter_info.minted_this_epoch = 0;
+        minter_info.epoch_start = now;
+    }
+
+    // Choose the appropriate counter based on epoch mode
+    let counter = if minter_info.epoch_duration > 0 {
+        minter_info.minted_this_epoch
+    } else {
+        minter_info.minted_amount
+    };
+
+    let new_counter = counter
         .checked_add(amount)
         .ok_or(StablecoinError::MathOverflow)?;
-    require!(new_minted <= minter_info.quota, StablecoinError::QuotaExceeded);
+    require!(new_counter <= minter_info.quota, StablecoinError::QuotaExceeded);
 
     // CPI: mint_to via stablecoin PDA (mint authority)
     let mint_key = ctx.accounts.mint.key();
@@ -78,8 +107,15 @@ pub fn handler(ctx: Context<MintTokens>, amount: u64) -> Result<()> {
         &[signer_seeds],
     )?;
 
-    // Update quota tracking
-    minter_info.minted_amount = new_minted;
+    // Update quota tracking (always update both lifetime and epoch counters)
+    minter_info.minted_amount = minter_info
+        .minted_amount
+        .checked_add(amount)
+        .ok_or(StablecoinError::MathOverflow)?;
+    minter_info.minted_this_epoch = minter_info
+        .minted_this_epoch
+        .checked_add(amount)
+        .ok_or(StablecoinError::MathOverflow)?;
 
     // Update global stats
     let stablecoin = &mut ctx.accounts.stablecoin;
@@ -94,7 +130,7 @@ pub fn handler(ctx: Context<MintTokens>, amount: u64) -> Result<()> {
         recipient: ctx.accounts.recipient_token_account.key(),
         amount,
         total_minted: stablecoin.total_minted,
-        timestamp: Clock::get()?.unix_timestamp,
+        timestamp: now,
     });
 
     Ok(())

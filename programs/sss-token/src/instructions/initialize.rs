@@ -21,6 +21,7 @@ pub struct InitializeParams {
     pub enable_permanent_delegate: bool,
     pub enable_transfer_hook: bool,
     pub default_account_frozen: bool,
+    pub max_supply: u64,
 }
 
 #[derive(Accounts)]
@@ -181,6 +182,7 @@ pub fn handler(ctx: Context<InitializeStablecoin>, params: InitializeParams) -> 
     stablecoin.paused = false;
     stablecoin.total_minted = 0;
     stablecoin.total_burned = 0;
+    stablecoin.max_supply = params.max_supply;
     stablecoin.bump = ctx.bumps.stablecoin;
 
     // ── 7. Grant all roles to the initializing authority ───────────────

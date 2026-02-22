@@ -80,46 +80,41 @@ anchor deploy --provider.cluster devnet
 
 ```bash
 # Initialize an SSS-1 stablecoin
-sss-token init --preset sss-1 --name "My Token" --symbol "MYUSD"
+sss-token init --name "My Token" --symbol MYUSD              # SSS-1
 
 # Initialize an SSS-2 compliant stablecoin
-sss-token init --preset sss-2 --name "Regulated Token" --symbol "RUSD"
+sss-token init --name "Regulated Token" --symbol RUSD --sss2  # SSS-2
 
 # Operations
-sss-token mint <recipient> <amount>
-sss-token burn <amount>
-sss-token freeze <address>
-sss-token thaw <address>
-sss-token pause
-sss-token unpause
-sss-token status
+sss-token mint -m <MINT> --to <TOKEN_ACCOUNT> --amount <N>
+sss-token burn -m <MINT> --from <TOKEN_ACCOUNT> --amount <N>
+sss-token freeze -m <MINT> --account <TOKEN_ACCOUNT>          # --thaw for thaw
+sss-token pause -m <MINT>                                     # --unpause for unpause
+sss-token status -m <MINT>
 
 # SSS-2 compliance
-sss-token blacklist add <address> --reason "OFAC match"
-sss-token blacklist remove <address>
-sss-token seize <address> --to <treasury>
+sss-token blacklist -m <MINT> --action add --address <PUBKEY> --reason "OFAC match"
+sss-token seize -m <MINT> --source <SRC_TA> --destination <DST_TA>
 ```
 
 ### TypeScript SDK
 
 ```typescript
-import { SolanaStablecoin, Presets } from "@stbr/sss-sdk";
+import { SolanaStablecoin, sss2Preset, ComplianceModule, RoleManager } from "@stbr/sss-sdk";
 
 // Create an SSS-2 compliant stablecoin
-const stable = await SolanaStablecoin.create(connection, {
-  preset: Presets.SSS_2,
-  name: "My Stablecoin",
-  symbol: "MYUSD",
-  decimals: 6,
-  authority: adminKeypair,
-});
+const { stablecoin, mint } = await SolanaStablecoin.create(
+  connection,
+  authority,
+  sss2Preset({ name: "My USD", symbol: "MYUSD" })
+);
 
 // Mint tokens
-await stable.mint({ recipient, amount: 1_000_000, minter });
+await stablecoin.mintTokens(minter, recipientTA, BigInt(1_000_000));
 
 // Compliance operations (SSS-2 only)
-await stable.compliance.blacklistAdd(address, "Sanctions match");
-await stable.compliance.seize(frozenAccount, treasury);
+const compliance = new ComplianceModule(connection, mint.publicKey, stablecoin.stablecoinPDA);
+await compliance.addToBlacklist(blacklister, address, "Sanctions match");
 ```
 
 ### Backend Services

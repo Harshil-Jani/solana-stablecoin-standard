@@ -43,4 +43,54 @@ pub enum StablecoinError {
 
     #[msg("Invalid role configuration")]
     InvalidRoleConfig,
+
+    // Feature 8: Supply cap
+    #[msg("Supply cap exceeded")]
+    SupplyCapExceeded,
+
+    #[msg("New supply cap is below current circulating supply")]
+    SupplyCapBelowCirculation,
+
+    // Feature 9: Batch operations
+    #[msg("Batch size exceeds maximum")]
+    BatchTooLarge,
+
+    // Feature 5: Multi-sig
+    #[msg("Caller is not a multisig signer")]
+    NotAMultisigSigner,
+
+    #[msg("Signer has already approved this proposal")]
+    AlreadyApproved,
+
+    #[msg("Proposal has already been executed")]
+    ProposalAlreadyExecuted,
+
+    #[msg("Proposal has been cancelled")]
+    ProposalCancelled,
+
+    #[msg("Insufficient approvals to execute")]
+    InsufficientApprovals,
+
+    #[msg("Invalid threshold (must be > 0 and <= number of signers)")]
+    InvalidThreshold,
+
+    #[msg("Too many signers (max 10)")]
+    TooManySigners,
+
+    // Feature 6: Timelock
+    #[msg("Timelock delay has not elapsed")]
+    TimelockNotReady,
+
+    #[msg("Timelock is not enabled")]
+    TimelockNotEnabled,
+
+    #[msg("Operation has already been executed")]
+    OperationAlreadyExecuted,
+
+    #[msg("Operation has been cancelled")]
+    OperationCancelled,
+
+    // Feature 10: Transfer limits
+    #[msg("Transfer limit exceeded")]
+    TransferLimitExceeded,
 }
