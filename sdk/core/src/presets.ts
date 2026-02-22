@@ -15,6 +15,7 @@ export function sss1Preset(overrides: Partial<StablecoinConfig> = {}): Stablecoi
     enablePermanentDelegate: false,
     enableTransferHook: false,
     defaultAccountFrozen: false,
+    maxSupply: BigInt(0),
     ...overrides,
   };
 }
@@ -35,6 +36,7 @@ export function sss2Preset(overrides: Partial<StablecoinConfig> = {}): Stablecoi
     enablePermanentDelegate: true,
     enableTransferHook: true,
     defaultAccountFrozen: true,
+    maxSupply: BigInt(0),
     ...overrides,
   };
 }

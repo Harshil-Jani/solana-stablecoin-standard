@@ -62,19 +62,34 @@ export class RoleManager {
   }
 
   /**
-   * Set a minter's quota (authority-only).
+   * Set a minter's quota and optional epoch duration (authority-only).
+   *
+   * If epochDuration is provided and > 0, the minter's quota resets
+   * every `epochDuration` seconds. Otherwise the quota is lifetime.
    */
   async updateMinter(
     authority: Keypair,
     minter: PublicKey,
-    quota: bigint
+    quota: bigint,
+    epochDuration?: bigint
   ): Promise<string> {
     const [minterInfoPDA] = findMinterPDA(this.stablecoinPDA, minter);
 
     const quotaBuf = Buffer.alloc(8);
     quotaBuf.writeBigUInt64LE(quota);
 
-    const data = Buffer.concat([anchorDisc("update_minter"), quotaBuf]);
+    // Serialize epoch_duration as Borsh Option<i64>: 0 = None, 1 + i64 LE = Some
+    let epochBuf: Buffer;
+    if (epochDuration !== undefined) {
+      epochBuf = Buffer.alloc(9);
+      epochBuf.writeUInt8(1, 0);
+      epochBuf.writeBigInt64LE(epochDuration, 1);
+    } else {
+      epochBuf = Buffer.alloc(1);
+      epochBuf.writeUInt8(0, 0);
+    }
+
+    const data = Buffer.concat([anchorDisc("update_minter"), quotaBuf, epochBuf]);
 
     const ix = new TransactionInstruction({
       keys: [

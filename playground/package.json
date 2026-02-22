@@ -1,0 +1,19 @@
+{
+  "name": "@sss/playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive playground for the Solana Stablecoin Standard SDK",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "start:devnet": "CLUSTER=devnet ts-node index.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "^0.4.10"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0"
+  }
+}

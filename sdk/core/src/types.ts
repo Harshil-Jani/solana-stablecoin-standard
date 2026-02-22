@@ -27,6 +27,7 @@ export interface StablecoinState {
   paused: boolean;
   totalMinted: bigint;
   totalBurned: bigint;
+  maxSupply: bigint;
   bump: number;
 }
 
@@ -50,6 +51,9 @@ export interface MinterInfo {
   minter: PublicKey;
   quota: bigint;
   mintedAmount: bigint;
+  epochDuration: bigint;
+  epochStart: bigint;
+  mintedThisEpoch: bigint;
   bump: number;
 }
 
@@ -72,6 +76,71 @@ export interface StablecoinConfig {
   enablePermanentDelegate: boolean;
   enableTransferHook: boolean;
   defaultAccountFrozen: boolean;
+  maxSupply?: bigint;
+}
+
+// ── Governance Types ──────────────────────────────────────────────
+
+export enum InstructionType {
+  Pause = 0,
+  Unpause = 1,
+  UpdateRoles = 2,
+  UpdateMinter = 3,
+  TransferAuthority = 4,
+  AddToBlacklist = 5,
+  RemoveFromBlacklist = 6,
+  UpdateSupplyCap = 7,
+  ConfigureTransferLimits = 8,
+}
+
+export interface MultisigConfig {
+  stablecoin: PublicKey;
+  signers: PublicKey[];
+  threshold: number;
+  proposalCount: bigint;
+  bump: number;
+}
+
+export interface Proposal {
+  stablecoin: PublicKey;
+  proposalId: bigint;
+  proposer: PublicKey;
+  instructionType: InstructionType;
+  data: Uint8Array;
+  approvals: boolean[];
+  approvalCount: number;
+  executed: boolean;
+  cancelled: boolean;
+  createdAt: bigint;
+  bump: number;
+}
+
+export interface TimelockConfig {
+  stablecoin: PublicKey;
+  delay: bigint;
+  enabled: boolean;
+  bump: number;
+}
+
+export interface TimelockOperation {
+  stablecoin: PublicKey;
+  opId: bigint;
+  opType: InstructionType;
+  data: Uint8Array;
+  eta: bigint;
+  proposer: PublicKey;
+  executed: boolean;
+  cancelled: boolean;
+  bump: number;
+}
+
+export interface TransferLimitConfig {
+  stablecoin: PublicKey;
+  maxPerTx: bigint;
+  maxPerDay: bigint;
+  dailyTransferred: bigint;
+  dayStart: bigint;
+  bump: number;
 }
 
 // ── Event Types ─────────────────────────────────────────────────────

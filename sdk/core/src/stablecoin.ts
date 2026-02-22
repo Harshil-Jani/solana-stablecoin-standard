@@ -67,6 +67,7 @@ export class SolanaStablecoin {
       Buffer.from([config.enablePermanentDelegate ? 1 : 0]),
       Buffer.from([config.enableTransferHook ? 1 : 0]),
       Buffer.from([config.defaultAccountFrozen ? 1 : 0]),
+      serializeU64(config.maxSupply ?? BigInt(0)),
     ]);
 
     const ix = new TransactionInstruction({
@@ -272,6 +273,32 @@ export class SolanaStablecoin {
       ],
       programId: SSS_TOKEN_PROGRAM_ID,
       data: anchorDisc("transfer_authority"),
+    });
+
+    const tx = new Transaction().add(ix);
+    return sendAndConfirmTransaction(this.connection, tx, [authority]);
+  }
+
+  /**
+   * Update the maximum supply cap (authority-only).
+   * Set to 0 to remove the cap.
+   */
+  async updateSupplyCap(
+    authority: Keypair,
+    newMaxSupply: bigint
+  ): Promise<string> {
+    const data = Buffer.concat([
+      anchorDisc("update_supply_cap"),
+      serializeU64(newMaxSupply),
+    ]);
+
+    const ix = new TransactionInstruction({
+      keys: [
+        { pubkey: authority.publicKey, isSigner: true, isWritable: false },
+        { pubkey: this.stablecoinPDA, isSigner: false, isWritable: true },
+      ],
+      programId: SSS_TOKEN_PROGRAM_ID,
+      data,
     });
 
     const tx = new Transaction().add(ix);
