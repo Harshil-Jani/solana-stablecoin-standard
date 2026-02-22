@@ -6,20 +6,33 @@ A modular, production-ready SDK for building stablecoins on Solana using Token-2
 
 Three-layer design:
 
-```
-┌─────────────────────────────────────────────┐
-│          Layer 3 — Standard Presets          │
-│     SSS-1 (Minimal)  │  SSS-2 (Compliant)  │
-├─────────────────────────────────────────────┤
-│          Layer 2 — Modules                   │
-│  Compliance (transfer hook, blacklist,       │
-│  permanent delegate) │ Privacy (confidential │
-│  transfers, allowlists)                      │
-├─────────────────────────────────────────────┤
-│          Layer 1 — Base SDK                  │
-│  Token creation │ Mint/Freeze authority │     │
-│  Metadata │ Role management │ CLI + SDK      │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph L3["Layer 3 — Standard Presets"]
+        SSS1["<b>SSS-1</b><br/>Minimal Stablecoin"]
+        SSS2["<b>SSS-2</b><br/>Compliant Stablecoin"]
+    end
+
+    subgraph L2["Layer 2 — Modules"]
+        COMP["<b>Compliance</b><br/>Transfer hook · Blacklist<br/>Permanent delegate"]
+        PRIV["<b>Privacy</b><br/>Confidential transfers<br/>Allowlists"]
+    end
+
+    subgraph L1["Layer 1 — Base SDK"]
+        BASE["Token creation · Mint/Freeze authority<br/>Metadata · Role management · CLI + SDK"]
+    end
+
+    L3 --> L2
+    L2 --> L1
+
+    style L3 fill:#1a1a2e,stroke:#e94560,color:#fff
+    style L2 fill:#16213e,stroke:#0f3460,color:#fff
+    style L1 fill:#0f3460,stroke:#533483,color:#fff
+    style SSS1 fill:#e94560,stroke:#e94560,color:#fff
+    style SSS2 fill:#533483,stroke:#533483,color:#fff
+    style COMP fill:#0f3460,stroke:#0f3460,color:#fff
+    style PRIV fill:#0f3460,stroke:#0f3460,color:#fff
+    style BASE fill:#533483,stroke:#533483,color:#fff
 ```
 
 ## Standards
@@ -111,19 +124,40 @@ docker compose up
 curl http://localhost:3000/health
 ```
 
+## System Components
+
+```mermaid
+flowchart TD
+    CLI["<b>Admin CLI / SDK</b><br/>sss-token init · mint · burn<br/>freeze · pause · status"]
+    TOKEN["<b>sss-token Program</b><br/>13 instructions · 4 PDA types · 6 roles"]
+    HOOK["<b>sss-transfer-hook</b><br/>Blacklist check on<br/>every transfer (SSS-2)"]
+    T22["<b>Token-2022 Program</b><br/>MintTo · Burn · Freeze<br/>TransferChecked"]
+    BACK["<b>Backend Service</b><br/>Event indexer · SQLite audit<br/>Webhook · REST API"]
+
+    CLI -- "TransactionInstruction" --> TOKEN
+    TOKEN -- "CPI" --> T22
+    TOKEN -- "Transfer Hook" --> HOOK
+    TOKEN -. "Events" .-> BACK
+
+    style CLI fill:#e94560,stroke:#e94560,color:#fff
+    style TOKEN fill:#0f3460,stroke:#0f3460,color:#fff
+    style HOOK fill:#533483,stroke:#533483,color:#fff
+    style T22 fill:#16213e,stroke:#16213e,color:#fff
+    style BACK fill:#1a1a2e,stroke:#e94560,color:#fff
+```
+
 ## Project Structure
 
 ```
-├── programs/
-│   ├── sss-token/          # Main stablecoin Anchor program
-│   └── sss-transfer-hook/  # Transfer hook for blacklist enforcement
-├── sdk/
-│   ├── core/               # TypeScript SDK (@stbr/sss-sdk)
-│   └── cli/                # Admin CLI (@stbr/sss-cli)
-├── backend/                # Express.js backend services
-├── tests/                  # Integration tests
-├── docs/                   # Documentation
-└── bonus/                  # Bonus features (SSS-3, oracle, TUI, frontend)
+programs/
+├── sss-token/              # Main stablecoin Anchor program (13 instructions)
+└── sss-transfer-hook/      # Transfer hook for blacklist enforcement (SSS-2)
+sdk/
+├── core/                   # TypeScript SDK (@stbr/sss-sdk)
+└── cli/                    # Admin CLI (sss-token)
+backend/                    # Express.js backend (event indexer + REST API)
+tests/                      # Integration tests (SSS-1 + SSS-2 lifecycle)
+docs/                       # Documentation (7 guides)
 ```
 
 ## Role-Based Access Control
