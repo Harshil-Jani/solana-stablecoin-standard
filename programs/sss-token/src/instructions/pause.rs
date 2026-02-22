@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::state::*;
 use crate::constants::*;
+use crate::error::StablecoinError;
+use crate::events::{StablecoinPaused, StablecoinUnpaused};
 
 #[derive(Accounts)]
 pub struct PauseUnpause<'info> {
@@ -21,12 +23,30 @@ pub struct PauseUnpause<'info> {
     pub role: Account<'info, RoleAccount>,
 }
 
-pub fn pause_handler(_ctx: Context<PauseUnpause>) -> Result<()> {
-    // TODO: Implement in Commit 6
+pub fn pause_handler(ctx: Context<PauseUnpause>) -> Result<()> {
+    require!(ctx.accounts.role.roles.is_pauser, StablecoinError::Unauthorized);
+
+    ctx.accounts.stablecoin.paused = true;
+
+    emit!(StablecoinPaused {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        paused_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     Ok(())
 }
 
-pub fn unpause_handler(_ctx: Context<PauseUnpause>) -> Result<()> {
-    // TODO: Implement in Commit 6
+pub fn unpause_handler(ctx: Context<PauseUnpause>) -> Result<()> {
+    require!(ctx.accounts.role.roles.is_pauser, StablecoinError::Unauthorized);
+
+    ctx.accounts.stablecoin.paused = false;
+
+    emit!(StablecoinUnpaused {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        unpaused_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     Ok(())
 }

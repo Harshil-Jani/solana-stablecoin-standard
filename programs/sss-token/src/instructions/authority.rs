@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::state::*;
 use crate::constants::*;
+use crate::events::AuthorityTransferred;
 
 #[derive(Accounts)]
 pub struct TransferAuthority<'info> {
@@ -19,7 +20,16 @@ pub struct TransferAuthority<'info> {
     pub new_authority: AccountInfo<'info>,
 }
 
-pub fn handler(_ctx: Context<TransferAuthority>) -> Result<()> {
-    // TODO: Implement in Commit 6
+pub fn handler(ctx: Context<TransferAuthority>) -> Result<()> {
+    let previous_authority = ctx.accounts.stablecoin.authority;
+    ctx.accounts.stablecoin.authority = ctx.accounts.new_authority.key();
+
+    emit!(AuthorityTransferred {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        previous_authority,
+        new_authority: ctx.accounts.new_authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     Ok(())
 }
