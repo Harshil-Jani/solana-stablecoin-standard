@@ -1,0 +1,37 @@
+# Rust/Anchor
+target/
+.anchor/
+**/*.rs.bk
+test-ledger/
+
+# Node
+node_modules/
+dist/
+.yarn/
+
+# IDE
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+*.so
+*.deploy
+
+# Conductor workspace
+.context/
+
+# SQLite
+*.sqlite
+*.sqlite-journal
+data/
+
+# Keys (never commit private keys)
+# keypairs/ are gitignored by default; deploy keypairs generated locally
+deploy-keypairs/

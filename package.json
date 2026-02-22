@@ -1,0 +1,29 @@
+{
+  "name": "solana-stablecoin-standard",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "sdk/core",
+    "sdk/cli",
+    "backend",
+    "tests"
+  ],
+  "scripts": {
+    "build": "yarn workspaces run build",
+    "test": "anchor test",
+    "lint": "eslint . --ext .ts",
+    "clean": "rm -rf node_modules sdk/*/dist backend/dist"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "^0.4.10",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "chai": "^4.4.0",
+    "mocha": "^10.4.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.5.0"
+  }
+}
