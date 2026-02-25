@@ -93,4 +93,12 @@ pub enum StablecoinError {
     // Feature 10: Transfer limits
     #[msg("Transfer limit exceeded")]
     TransferLimitExceeded,
+
+    // Two-step authority transfer
+    #[msg("No pending authority transfer to accept")]
+    NoPendingAuthority,
+
+    // Timelock validation
+    #[msg("Timelock delay must be non-negative")]
+    InvalidTimelockDelay,
 }

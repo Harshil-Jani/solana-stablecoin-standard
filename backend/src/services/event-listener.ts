@@ -22,6 +22,14 @@ const EVENT_NAMES = [
   "AddedToBlacklist",
   "RemovedFromBlacklist",
   "TokensSeized",
+  "MultisigCreated",
+  "ProposalCreated",
+  "ProposalApproved",
+  "ProposalExecuted",
+  "TimelockConfigured",
+  "TimelockProposed",
+  "TimelockExecuted",
+  "TimelockCancelled",
 ] as const;
 
 type EventName = (typeof EVENT_NAMES)[number];
@@ -48,6 +56,10 @@ function readU64(data: Buffer, offset: number): [string, number] {
 function readI64(data: Buffer, offset: number): [string, number] {
   const val = data.readBigInt64LE(offset);
   return [val.toString(), offset + 8];
+}
+
+function readU8(data: Buffer, offset: number): [number, number] {
+  return [data[offset], offset + 1];
 }
 
 function readBool(data: Buffer, offset: number): [boolean, number] {
@@ -176,6 +188,68 @@ function decodeEvent(name: EventName, data: Buffer): Record<string, unknown> {
       [fields.timestamp, offset] = readI64(data, offset);
       break;
     }
+    case "MultisigCreated": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.threshold, offset] = readU8(data, offset);
+      [fields.signer_count, offset] = readU8(data, offset);
+      [fields.created_by, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "ProposalCreated": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.proposal_id, offset] = readU64(data, offset);
+      [fields.instruction_type, offset] = readU8(data, offset);
+      [fields.proposer, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "ProposalApproved": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.proposal_id, offset] = readU64(data, offset);
+      [fields.approver, offset] = readPubkey(data, offset);
+      [fields.approval_count, offset] = readU8(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "ProposalExecuted": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.proposal_id, offset] = readU64(data, offset);
+      [fields.executor, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "TimelockConfigured": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.delay, offset] = readI64(data, offset);
+      [fields.enabled, offset] = readBool(data, offset);
+      [fields.configured_by, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "TimelockProposed": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.op_id, offset] = readU64(data, offset);
+      [fields.op_type, offset] = readU8(data, offset);
+      [fields.eta, offset] = readI64(data, offset);
+      [fields.proposer, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "TimelockExecuted": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.op_id, offset] = readU64(data, offset);
+      [fields.executor, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
+    case "TimelockCancelled": {
+      [fields.stablecoin, offset] = readPubkey(data, offset);
+      [fields.op_id, offset] = readU64(data, offset);
+      [fields.cancelled_by, offset] = readPubkey(data, offset);
+      [fields.timestamp, offset] = readI64(data, offset);
+      break;
+    }
   }
 
   return fields;
@@ -268,6 +342,54 @@ const OPERATION_MAP: Record<EventName, OperationMapping> = {
     actor: (f) => f.updated_by as string,
     amount: (f) => f.new_quota as string,
     target: (f) => f.minter as string,
+  },
+  MultisigCreated: {
+    operation: "multisig_create",
+    actor: (f) => f.created_by as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  ProposalCreated: {
+    operation: "proposal_create",
+    actor: (f) => f.proposer as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  ProposalApproved: {
+    operation: "proposal_approve",
+    actor: (f) => f.approver as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  ProposalExecuted: {
+    operation: "proposal_execute",
+    actor: (f) => f.executor as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  TimelockConfigured: {
+    operation: "timelock_configure",
+    actor: (f) => f.configured_by as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  TimelockProposed: {
+    operation: "timelock_propose",
+    actor: (f) => f.proposer as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  TimelockExecuted: {
+    operation: "timelock_execute",
+    actor: (f) => f.executor as string,
+    amount: () => undefined,
+    target: () => undefined,
+  },
+  TimelockCancelled: {
+    operation: "timelock_cancel",
+    actor: (f) => f.cancelled_by as string,
+    amount: () => undefined,
+    target: () => undefined,
   },
 };
 

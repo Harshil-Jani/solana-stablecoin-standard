@@ -408,6 +408,8 @@ export function buildSeizeIx(
   seizer: PublicKey,
   stablecoin: PublicKey,
   role: PublicKey,
+  blacklistEntry: PublicKey,
+  sourceOwner: PublicKey,
   mint: PublicKey,
   sourceTokenAccount: PublicKey,
   destinationTokenAccount: PublicKey
@@ -417,6 +419,8 @@ export function buildSeizeIx(
       { pubkey: seizer, isSigner: true, isWritable: false },
       { pubkey: stablecoin, isSigner: false, isWritable: false },
       { pubkey: role, isSigner: false, isWritable: false },
+      { pubkey: blacklistEntry, isSigner: false, isWritable: false },
+      { pubkey: sourceOwner, isSigner: false, isWritable: false },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
       { pubkey: destinationTokenAccount, isSigner: false, isWritable: true },
@@ -424,6 +428,20 @@ export function buildSeizeIx(
     ],
     programId: SSS_TOKEN_PROGRAM_ID,
     data: anchorDiscriminator("seize"),
+  });
+}
+
+export function buildAcceptAuthorityIx(
+  newAuthority: PublicKey,
+  stablecoin: PublicKey
+): TransactionInstruction {
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: newAuthority, isSigner: true, isWritable: false },
+      { pubkey: stablecoin, isSigner: false, isWritable: true },
+    ],
+    programId: SSS_TOKEN_PROGRAM_ID,
+    data: anchorDiscriminator("accept_authority"),
   });
 }
 

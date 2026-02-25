@@ -7,13 +7,9 @@ import {
   TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import * as crypto from "crypto";
 import { SSS_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "./types";
 import { findRolePDA, findBlacklistPDA } from "./pda";
-
-function anchorDisc(name: string): Buffer {
-  return crypto.createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
-}
+import { anchorDisc } from "./utils";
 
 /**
  * SSS-2 compliance operations: blacklist management and asset seizure.
@@ -89,19 +85,27 @@ export class ComplianceModule {
   /**
    * Seize all tokens from a blacklisted account (seizer role required).
    * Uses the permanent delegate authority on the mint.
+   *
+   * @param sourceOwner  The wallet address that owns the source token account (must be blacklisted)
+   * @param sourceTokenAccount  The token account to seize from
+   * @param destinationTokenAccount  The treasury token account to receive seized tokens
    */
   async seize(
     seizer: Keypair,
+    sourceOwner: PublicKey,
     sourceTokenAccount: PublicKey,
     destinationTokenAccount: PublicKey
   ): Promise<string> {
     const [role] = findRolePDA(this.stablecoinPDA, seizer.publicKey);
+    const [blacklistEntry] = findBlacklistPDA(this.stablecoinPDA, sourceOwner);
 
     const ix = new TransactionInstruction({
       keys: [
         { pubkey: seizer.publicKey, isSigner: true, isWritable: false },
         { pubkey: this.stablecoinPDA, isSigner: false, isWritable: false },
         { pubkey: role, isSigner: false, isWritable: false },
+        { pubkey: blacklistEntry, isSigner: false, isWritable: false },
+        { pubkey: sourceOwner, isSigner: false, isWritable: false },
         { pubkey: this.mint, isSigner: false, isWritable: false },
         { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
         { pubkey: destinationTokenAccount, isSigner: false, isWritable: true },

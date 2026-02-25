@@ -86,7 +86,8 @@ describe("Edge Cases", () => {
       ), [minterKeypair]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Anchor error 6001 = 0x1771 = Paused
+      expect(err.message).to.include("0x1771");
     }
 
     // Unpause for subsequent tests
@@ -119,7 +120,8 @@ describe("Edge Cases", () => {
       ), [minterKeypair]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Anchor error 6001 = 0x1771 = Paused
+      expect(err.message).to.include("0x1771");
     }
 
     // Unpause
@@ -141,7 +143,8 @@ describe("Edge Cases", () => {
       ), [minterKeypair]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Anchor error 6006 = 0x1776 = ZeroAmount
+      expect(err.message).to.include("0x1776");
     }
   });
 
@@ -156,14 +159,15 @@ describe("Edge Cases", () => {
       buildFreezeAccountIx(authority.publicKey, stablecoinPDA, authorityRole, mintKeypair.publicKey, targetATA)
     ), [authority]);
 
-    // Freeze again — should fail (Token-2022 error)
+    // Freeze again — should fail (Token-2022 AccountFrozen error)
     try {
       await sendAndConfirmTransaction(connection, new Transaction().add(
         buildFreezeAccountIx(authority.publicKey, stablecoinPDA, authorityRole, mintKeypair.publicKey, targetATA)
       ), [authority]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Token-2022 program returns AccountFrozen when account is already frozen
+      expect(err.message).to.include("custom program error");
     }
   });
 
@@ -191,7 +195,8 @@ describe("Edge Cases", () => {
       ), [nonMinter]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Anchor error 6000 = 0x1770 = Unauthorized (no minter role)
+      expect(err.message).to.include("0x1770");
     }
   });
 });

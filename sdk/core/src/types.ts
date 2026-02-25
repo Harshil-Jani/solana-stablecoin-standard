@@ -29,6 +29,7 @@ export interface StablecoinState {
   totalBurned: bigint;
   maxSupply: bigint;
   bump: number;
+  pendingAuthority?: PublicKey;
 }
 
 export interface RoleFlags {
@@ -158,4 +159,12 @@ export type StablecoinEvent =
   | { type: "AuthorityTransferred"; stablecoin: PublicKey; previousAuthority: PublicKey; newAuthority: PublicKey; timestamp: bigint }
   | { type: "AddedToBlacklist"; stablecoin: PublicKey; address: PublicKey; reason: string; blacklistedBy: PublicKey; timestamp: bigint }
   | { type: "RemovedFromBlacklist"; stablecoin: PublicKey; address: PublicKey; removedBy: PublicKey; timestamp: bigint }
-  | { type: "TokensSeized"; stablecoin: PublicKey; from: PublicKey; to: PublicKey; amount: bigint; seizedBy: PublicKey; timestamp: bigint };
+  | { type: "TokensSeized"; stablecoin: PublicKey; from: PublicKey; to: PublicKey; amount: bigint; seizedBy: PublicKey; timestamp: bigint }
+  | { type: "MultisigCreated"; stablecoin: PublicKey; threshold: number; signerCount: number; createdBy: PublicKey; timestamp: bigint }
+  | { type: "ProposalCreated"; stablecoin: PublicKey; proposalId: bigint; instructionType: InstructionType; proposer: PublicKey; timestamp: bigint }
+  | { type: "ProposalApproved"; stablecoin: PublicKey; proposalId: bigint; approver: PublicKey; approvalCount: number; timestamp: bigint }
+  | { type: "ProposalExecuted"; stablecoin: PublicKey; proposalId: bigint; executor: PublicKey; timestamp: bigint }
+  | { type: "TimelockConfigured"; stablecoin: PublicKey; delay: bigint; enabled: boolean; configuredBy: PublicKey; timestamp: bigint }
+  | { type: "TimelockProposed"; stablecoin: PublicKey; opId: bigint; opType: InstructionType; eta: bigint; proposer: PublicKey; timestamp: bigint }
+  | { type: "TimelockExecuted"; stablecoin: PublicKey; opId: bigint; executor: PublicKey; timestamp: bigint }
+  | { type: "TimelockCancelled"; stablecoin: PublicKey; opId: bigint; cancelledBy: PublicKey; timestamp: bigint };

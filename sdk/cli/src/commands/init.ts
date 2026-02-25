@@ -36,6 +36,10 @@ export async function handler(argv: ArgumentsCamelCase) {
   const [stablecoinPda] = PublicKey.findProgramAddressSync([STABLECOIN_SEED, mintKeypair.publicKey.toBuffer()], programId);
   const [authorityRole] = PublicKey.findProgramAddressSync([ROLE_SEED, stablecoinPda.toBuffer(), authority.publicKey.toBuffer()], programId);
 
+  // max_supply: u64 (0 = no cap)
+  const maxSupplyBuf = Buffer.alloc(8);
+  maxSupplyBuf.writeBigUInt64LE(BigInt(0));
+
   const data = Buffer.concat([
     disc("initialize"),
     str(argv.name as string),
@@ -45,6 +49,7 @@ export async function handler(argv: ArgumentsCamelCase) {
     Buffer.from([isSss2 ? 1 : 0]),
     Buffer.from([isSss2 ? 1 : 0]),
     Buffer.from([isSss2 ? 1 : 0]),
+    maxSupplyBuf,
   ]);
 
   const ix = new TransactionInstruction({

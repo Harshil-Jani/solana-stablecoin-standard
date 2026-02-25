@@ -53,8 +53,14 @@ pub mod sss_token {
         instructions::roles::update_minter_handler(ctx, quota, epoch_duration)
     }
 
+    /// Step 1: Propose authority transfer (sets pending_authority).
     pub fn transfer_authority(ctx: Context<TransferAuthority>) -> Result<()> {
-        instructions::authority::handler(ctx)
+        instructions::authority::transfer_authority_handler(ctx)
+    }
+
+    /// Step 2: New authority accepts the transfer (proves key ownership).
+    pub fn accept_authority(ctx: Context<AcceptAuthority>) -> Result<()> {
+        instructions::authority::accept_authority_handler(ctx)
     }
 
     // === SSS-2 Compliance Instructions ===
@@ -68,7 +74,7 @@ pub mod sss_token {
     }
 
     pub fn seize(ctx: Context<Seize>) -> Result<()> {
-        instructions::seize::handler(ctx)
+        instructions::seize::seize_handler(ctx)
     }
 
     // === Feature 8: Supply Cap ===

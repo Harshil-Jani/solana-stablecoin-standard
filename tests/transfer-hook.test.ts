@@ -177,7 +177,8 @@ describe("SSS-2 Transfer Hook: Blacklist Enforcement", () => {
       await sendAndConfirmTransaction(connection, new Transaction().add(transferIx), [senderKeypair]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Transfer hook rejects blacklisted source with custom program error
+      expect(err.message).to.include("custom program error");
     }
   });
 
@@ -212,7 +213,8 @@ describe("SSS-2 Transfer Hook: Blacklist Enforcement", () => {
       await sendAndConfirmTransaction(connection, new Transaction().add(transferIx), [authority]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Transfer hook rejects blacklisted destination with custom program error
+      expect(err.message).to.include("custom program error");
     }
   });
 

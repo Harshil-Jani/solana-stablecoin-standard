@@ -7,13 +7,9 @@ import {
   TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import * as crypto from "crypto";
 import { SSS_TOKEN_PROGRAM_ID, type RoleFlags } from "./types";
 import { findRolePDA, findMinterPDA } from "./pda";
-
-function anchorDisc(name: string): Buffer {
-  return crypto.createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
-}
+import { anchorDisc } from "./utils";
 
 /**
  * Manages RBAC role assignments and minter quotas.

@@ -27,6 +27,17 @@ pub struct Seize<'info> {
     )]
     pub role: Account<'info, RoleAccount>,
 
+    /// The source owner must be blacklisted before seizure is allowed.
+    /// This PDA's existence proves the address was blacklisted by a blacklister.
+    #[account(
+        seeds = [BLACKLIST_SEED, stablecoin.key().as_ref(), source_owner.key().as_ref()],
+        bump = blacklist_entry.bump,
+    )]
+    pub blacklist_entry: Account<'info, BlacklistEntry>,
+
+    /// CHECK: The wallet owner of the source token account (must match blacklist entry)
+    pub source_owner: AccountInfo<'info>,
+
     /// CHECK: Token-2022 mint
     pub mint: AccountInfo<'info>,
 
@@ -43,7 +54,8 @@ pub struct Seize<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-pub fn handler(ctx: Context<Seize>) -> Result<()> {
+/// Seize all tokens from a blacklisted address (seizer role + blacklist verification required).
+pub fn seize_handler(ctx: Context<Seize>) -> Result<()> {
     // Feature gate: only SSS-2 tokens support seizure
     require!(
         ctx.accounts.stablecoin.enable_permanent_delegate,
@@ -51,12 +63,15 @@ pub fn handler(ctx: Context<Seize>) -> Result<()> {
     );
     require!(ctx.accounts.role.roles.is_seizer, StablecoinError::Unauthorized);
 
-    // Read full balance from source token account.
-    // Must use StateWithExtensions (not Pack::unpack) because Token-2022 accounts
-    // carry TLV extension data beyond the base 165-byte layout, and Pack::unpack
-    // enforces a strict length == 165 check that always fails on Token-2022 accounts.
+    // Verify the source token account is actually owned by the blacklisted address.
+    // The blacklist_entry PDA is derived from source_owner, and Anchor's seed
+    // constraint guarantees it exists. We verify source_token_account.owner matches.
     let source_data = ctx.accounts.source_token_account.try_borrow_data()?;
     let source_account = StateWithExtensions::<SplAccount>::unpack(&source_data)?;
+    require!(
+        source_account.base.owner == ctx.accounts.source_owner.key(),
+        StablecoinError::Unauthorized
+    );
     let amount = source_account.base.amount;
     drop(source_data);
 

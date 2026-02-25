@@ -96,7 +96,8 @@ describe("Role-Based Access Control", () => {
       await sendAndConfirmTransaction(connection, new Transaction().add(mintIx), [minterKeypair]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Anchor error 6000 = 0x1770 = Unauthorized (minter role revoked)
+      expect(err.message).to.include("0x1770");
     }
   });
 
@@ -126,7 +127,8 @@ describe("Role-Based Access Control", () => {
       await sendAndConfirmTransaction(connection, new Transaction().add(mintIx), [minterKeypair]);
       expect.fail("Should have thrown");
     } catch (err: any) {
-      expect(err.message).to.include("Error");
+      // Anchor error 6005 = 0x1775 = QuotaExceeded
+      expect(err.message).to.include("0x1775");
     }
   });
 });

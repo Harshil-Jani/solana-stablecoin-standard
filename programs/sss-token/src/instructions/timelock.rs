@@ -30,16 +30,27 @@ pub struct ConfigureTimelock<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Configure timelock parameters (authority-only).
 pub fn configure_timelock_handler(
     ctx: Context<ConfigureTimelock>,
     delay: i64,
     enabled: bool,
 ) -> Result<()> {
+    require!(delay >= 0, StablecoinError::InvalidTimelockDelay);
+
     let config = &mut ctx.accounts.timelock_config;
     config.stablecoin = ctx.accounts.stablecoin.key();
     config.delay = delay;
     config.enabled = enabled;
     config.bump = ctx.bumps.timelock_config;
+
+    emit!(crate::events::TimelockConfigured {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        delay,
+        enabled,
+        configured_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
 
     Ok(())
 }
@@ -77,6 +88,7 @@ pub struct ProposeTimelockedV2<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Propose a timelocked operation (authority-only).
 pub fn propose_timelocked_handler(
     ctx: Context<ProposeTimelockedV2>,
     op_id: u64,
@@ -100,6 +112,15 @@ pub fn propose_timelocked_handler(
     op.cancelled = false;
     op.bump = ctx.bumps.timelock_op;
 
+    emit!(crate::events::TimelockProposed {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        op_id,
+        op_type,
+        eta,
+        proposer: ctx.accounts.authority.key(),
+        timestamp: now,
+    });
+
     Ok(())
 }
 
@@ -108,12 +129,14 @@ pub fn propose_timelocked_handler(
 #[derive(Accounts)]
 #[instruction(op_id: u64)]
 pub struct ExecuteTimelocked<'info> {
+    /// Executor must be the stablecoin authority.
     pub executor: Signer<'info>,
 
     #[account(
         mut,
         seeds = [STABLECOIN_SEED, stablecoin.mint.as_ref()],
         bump = stablecoin.bump,
+        constraint = stablecoin.authority == executor.key() @ StablecoinError::Unauthorized,
     )]
     pub stablecoin: Account<'info, StablecoinState>,
 
@@ -125,6 +148,7 @@ pub struct ExecuteTimelocked<'info> {
     pub timelock_op: Account<'info, TimelockOperation>,
 }
 
+/// Execute a timelocked operation after its delay has elapsed (authority-only).
 pub fn execute_timelocked_handler(ctx: Context<ExecuteTimelocked>, _op_id: u64) -> Result<()> {
     let op = &mut ctx.accounts.timelock_op;
     require!(!op.executed, StablecoinError::OperationAlreadyExecuted);
@@ -162,13 +186,22 @@ pub fn execute_timelocked_handler(ctx: Context<ExecuteTimelocked>, _op_id: u64) 
             if op.data.len() >= 32 {
                 let new_authority = Pubkey::try_from(&op.data[..32])
                     .map_err(|_| StablecoinError::InvalidRoleConfig)?;
-                stablecoin.authority = new_authority;
+                stablecoin.pending_authority = Some(new_authority);
             }
         }
+        // Other instruction types require additional accounts (remaining_accounts)
+        // and are recorded for off-chain indexers to process
         _ => {}
     }
 
     op.executed = true;
+
+    emit!(crate::events::TimelockExecuted {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        op_id: op.op_id,
+        executor: ctx.accounts.executor.key(),
+        timestamp: now,
+    });
 
     Ok(())
 }
@@ -195,12 +228,20 @@ pub struct CancelTimelocked<'info> {
     pub timelock_op: Account<'info, TimelockOperation>,
 }
 
+/// Cancel a pending timelocked operation (authority-only).
 pub fn cancel_timelocked_handler(ctx: Context<CancelTimelocked>, _op_id: u64) -> Result<()> {
     let op = &mut ctx.accounts.timelock_op;
     require!(!op.executed, StablecoinError::OperationAlreadyExecuted);
     require!(!op.cancelled, StablecoinError::OperationCancelled);
 
     op.cancelled = true;
+
+    emit!(crate::events::TimelockCancelled {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        op_id: op.op_id,
+        cancelled_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
 
     Ok(())
 }

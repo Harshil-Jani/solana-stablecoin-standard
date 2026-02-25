@@ -8,33 +8,14 @@ import {
   sendAndConfirmTransaction,
   SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
-import * as crypto from "crypto";
 import {
   SSS_TOKEN_PROGRAM_ID,
   SSS_HOOK_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   type StablecoinConfig,
-  type StablecoinState,
-  type RoleFlags,
 } from "./types";
 import { findStablecoinPDA, findRolePDA, findMinterPDA } from "./pda";
-
-function anchorDisc(name: string): Buffer {
-  return crypto.createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
-}
-
-function serializeString(s: string): Buffer {
-  const bytes = Buffer.from(s, "utf-8");
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(bytes.length);
-  return Buffer.concat([len, bytes]);
-}
-
-function serializeU64(n: bigint): Buffer {
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64LE(n);
-  return buf;
-}
+import { anchorDisc, serializeString, serializeU64 } from "./utils";
 
 /**
  * Main entry point for creating and managing SSS stablecoins.
@@ -259,7 +240,8 @@ export class SolanaStablecoin {
   }
 
   /**
-   * Transfer master authority to a new address.
+   * Step 1 of two-step authority transfer: set pending authority.
+   * The new authority must call `acceptAuthority()` to finalize.
    */
   async transferAuthority(
     authority: Keypair,
@@ -277,6 +259,24 @@ export class SolanaStablecoin {
 
     const tx = new Transaction().add(ix);
     return sendAndConfirmTransaction(this.connection, tx, [authority]);
+  }
+
+  /**
+   * Step 2 of two-step authority transfer: the pending authority accepts.
+   * This proves the new authority controls the key, preventing lockout.
+   */
+  async acceptAuthority(newAuthority: Keypair): Promise<string> {
+    const ix = new TransactionInstruction({
+      keys: [
+        { pubkey: newAuthority.publicKey, isSigner: true, isWritable: false },
+        { pubkey: this.stablecoinPDA, isSigner: false, isWritable: true },
+      ],
+      programId: SSS_TOKEN_PROGRAM_ID,
+      data: anchorDisc("accept_authority"),
+    });
+
+    const tx = new Transaction().add(ix);
+    return sendAndConfirmTransaction(this.connection, tx, [newAuthority]);
   }
 
   /**

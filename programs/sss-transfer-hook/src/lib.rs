@@ -168,6 +168,9 @@ pub mod sss_transfer_hook {
 
 /// Read the `paused` flag from a Borsh-serialized StablecoinState account.
 ///
+/// **Fail-closed**: returns `true` (paused) if the data is malformed or too short.
+/// This prevents transfers when the stablecoin state cannot be verified.
+///
 /// Layout:
 ///   8  bytes — Anchor discriminator
 ///   32 bytes — authority (Pubkey)
@@ -187,7 +190,7 @@ fn read_paused_flag(data: &[u8]) -> bool {
     // Skip three variable-length Borsh strings (name, symbol, uri)
     for _ in 0..3 {
         if data.len() < offset + 4 {
-            return false;
+            return true; // fail-closed: block transfers if data is malformed
         }
         let str_len = u32::from_le_bytes(
             data[offset..offset + 4].try_into().unwrap_or([0; 4]),
@@ -200,7 +203,7 @@ fn read_paused_flag(data: &[u8]) -> bool {
 
     // Read the paused byte
     if data.len() <= offset {
-        return false;
+        return true; // fail-closed: block transfers if data is too short
     }
     data[offset] != 0
 }

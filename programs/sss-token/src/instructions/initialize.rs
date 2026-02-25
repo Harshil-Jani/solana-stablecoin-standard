@@ -184,6 +184,7 @@ pub fn handler(ctx: Context<InitializeStablecoin>, params: InitializeParams) -> 
     stablecoin.total_burned = 0;
     stablecoin.max_supply = params.max_supply;
     stablecoin.bump = ctx.bumps.stablecoin;
+    stablecoin.pending_authority = None;
 
     // ── 7. Grant all roles to the initializing authority ───────────────
     let role = &mut ctx.accounts.authority_role;

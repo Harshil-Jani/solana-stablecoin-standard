@@ -28,6 +28,9 @@ pub struct StablecoinState {
     pub max_supply: u64,
     /// PDA bump
     pub bump: u8,
+    /// Two-step authority transfer: pending authority must call accept_authority.
+    /// Prevents accidental lockout from typos in authority pubkey.
+    pub pending_authority: Option<Pubkey>,
 }
 
 impl StablecoinState {
@@ -45,7 +48,8 @@ impl StablecoinState {
         + 8                     // total_minted
         + 8                     // total_burned
         + 8                     // max_supply
-        + 1;                    // bump
+        + 1                     // bump
+        + (1 + 32);             // pending_authority (Option<Pubkey>)
 
     pub fn is_sss2(&self) -> bool {
         self.enable_permanent_delegate && self.enable_transfer_hook
@@ -70,8 +74,8 @@ impl RoleAccount {
         + 1;                    // bump
 }
 
-/// Bitflag roles for gas-efficient storage.
-/// Each role maps to a specific capability in the stablecoin system.
+/// Boolean role flags for the stablecoin system.
+/// Each flag maps to a specific capability (minter, burner, pauser, etc.).
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
 pub struct RoleFlags {
     pub is_minter: bool,

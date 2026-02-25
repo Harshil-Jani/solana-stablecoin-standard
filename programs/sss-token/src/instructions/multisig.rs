@@ -30,6 +30,7 @@ pub struct CreateMultisig<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Create a multisig governance configuration (authority-only).
 pub fn create_multisig_handler(
     ctx: Context<CreateMultisig>,
     signers: Vec<Pubkey>,
@@ -50,6 +51,14 @@ pub fn create_multisig_handler(
     multisig.threshold = threshold;
     multisig.proposal_count = 0;
     multisig.bump = ctx.bumps.multisig;
+
+    emit!(crate::events::MultisigCreated {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        threshold,
+        signer_count: multisig.signers.len() as u8,
+        created_by: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
 
     Ok(())
 }
@@ -86,6 +95,7 @@ pub struct CreateProposal<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Create a multisig proposal (must be a registered signer).
 pub fn create_proposal_handler(
     ctx: Context<CreateProposal>,
     instruction_type: InstructionType,
@@ -107,9 +117,11 @@ pub fn create_proposal_handler(
     let mut approvals = vec![false; multisig.signers.len()];
     approvals[signer_index] = true; // Auto-approve for proposer
 
+    let proposal_id = multisig.proposal_count;
+
     let proposal = &mut ctx.accounts.proposal;
     proposal.stablecoin = ctx.accounts.stablecoin.key();
-    proposal.proposal_id = multisig.proposal_count;
+    proposal.proposal_id = proposal_id;
     proposal.proposer = proposer_key;
     proposal.instruction_type = instruction_type;
     proposal.data = data;
@@ -126,6 +138,14 @@ pub fn create_proposal_handler(
         .proposal_count
         .checked_add(1)
         .ok_or(StablecoinError::MathOverflow)?;
+
+    emit!(crate::events::ProposalCreated {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        proposal_id,
+        instruction_type,
+        proposer: proposer_key,
+        timestamp: proposal.created_at,
+    });
 
     Ok(())
 }
@@ -157,6 +177,7 @@ pub struct ApproveProposal<'info> {
     pub proposal: Account<'info, Proposal>,
 }
 
+/// Approve a multisig proposal (must be a registered signer).
 pub fn approve_proposal_handler(ctx: Context<ApproveProposal>, _proposal_id: u64) -> Result<()> {
     let proposal = &mut ctx.accounts.proposal;
     require!(!proposal.executed, StablecoinError::ProposalAlreadyExecuted);
@@ -179,6 +200,14 @@ pub fn approve_proposal_handler(ctx: Context<ApproveProposal>, _proposal_id: u64
         .checked_add(1)
         .ok_or(StablecoinError::MathOverflow)?;
 
+    emit!(crate::events::ProposalApproved {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        proposal_id: proposal.proposal_id,
+        approver: signer_key,
+        approval_count: proposal.approval_count,
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     Ok(())
 }
 
@@ -187,6 +216,7 @@ pub fn approve_proposal_handler(ctx: Context<ApproveProposal>, _proposal_id: u64
 #[derive(Accounts)]
 #[instruction(proposal_id: u64)]
 pub struct ExecuteProposal<'info> {
+    /// Executor must be a registered multisig signer.
     #[account(mut)]
     pub executor: Signer<'info>,
 
@@ -211,7 +241,15 @@ pub struct ExecuteProposal<'info> {
     pub proposal: Account<'info, Proposal>,
 }
 
+/// Execute a multisig proposal once threshold is reached (must be a registered signer).
 pub fn execute_proposal_handler(ctx: Context<ExecuteProposal>, _proposal_id: u64) -> Result<()> {
+    // Verify executor is a multisig signer
+    let executor_key = ctx.accounts.executor.key();
+    require!(
+        ctx.accounts.multisig.signers.iter().any(|s| *s == executor_key),
+        StablecoinError::NotAMultisigSigner
+    );
+
     let proposal = &mut ctx.accounts.proposal;
     require!(!proposal.executed, StablecoinError::ProposalAlreadyExecuted);
     require!(!proposal.cancelled, StablecoinError::ProposalCancelled);
@@ -251,15 +289,22 @@ pub fn execute_proposal_handler(ctx: Context<ExecuteProposal>, _proposal_id: u64
             if proposal.data.len() >= 32 {
                 let new_authority = Pubkey::try_from(&proposal.data[..32])
                     .map_err(|_| StablecoinError::InvalidRoleConfig)?;
-                stablecoin.authority = new_authority;
+                stablecoin.pending_authority = Some(new_authority);
             }
         }
         // Other instruction types require additional accounts (remaining_accounts)
-        // and are left as record-only for this version
+        // and are recorded for off-chain indexers to process
         _ => {}
     }
 
     proposal.executed = true;
+
+    emit!(crate::events::ProposalExecuted {
+        stablecoin: ctx.accounts.stablecoin.key(),
+        proposal_id: proposal.proposal_id,
+        executor: executor_key,
+        timestamp: Clock::get()?.unix_timestamp,
+    });
 
     Ok(())
 }

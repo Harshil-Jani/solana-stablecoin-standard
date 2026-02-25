@@ -116,3 +116,75 @@ pub struct TokensSeized {
     pub seized_by: Pubkey,
     pub timestamp: i64,
 }
+
+// ── Governance Events ────────────────────────────────────────────────
+
+#[event]
+pub struct MultisigCreated {
+    pub stablecoin: Pubkey,
+    pub threshold: u8,
+    pub signer_count: u8,
+    pub created_by: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ProposalCreated {
+    pub stablecoin: Pubkey,
+    pub proposal_id: u64,
+    pub instruction_type: crate::state::InstructionType,
+    pub proposer: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ProposalApproved {
+    pub stablecoin: Pubkey,
+    pub proposal_id: u64,
+    pub approver: Pubkey,
+    pub approval_count: u8,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ProposalExecuted {
+    pub stablecoin: Pubkey,
+    pub proposal_id: u64,
+    pub executor: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TimelockConfigured {
+    pub stablecoin: Pubkey,
+    pub delay: i64,
+    pub enabled: bool,
+    pub configured_by: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TimelockProposed {
+    pub stablecoin: Pubkey,
+    pub op_id: u64,
+    pub op_type: crate::state::InstructionType,
+    pub eta: i64,
+    pub proposer: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TimelockExecuted {
+    pub stablecoin: Pubkey,
+    pub op_id: u64,
+    pub executor: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TimelockCancelled {
+    pub stablecoin: Pubkey,
+    pub op_id: u64,
+    pub cancelled_by: Pubkey,
+    pub timestamp: i64,
+}
