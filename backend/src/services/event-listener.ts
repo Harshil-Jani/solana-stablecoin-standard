@@ -428,7 +428,7 @@ export class EventListener {
     }
   }
 
-  private processLog(logInfo: { signature: string; err: object | null; logs: string[] }): void {
+  private processLog(logInfo: { signature: string; err: unknown; logs: string[] }): void {
     if (logInfo.err) return;
 
     for (const log of logInfo.logs) {
