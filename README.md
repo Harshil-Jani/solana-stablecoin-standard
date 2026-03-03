@@ -10,6 +10,32 @@ A modular, production-ready SDK for building stablecoins on Solana using Token-2
 
 > **6 live operations on localnet:** SSS-1 creation, role management, pause/unpause, authority transfer, SSS-2 compliant stablecoin, and blacklist enforcement.
 
+---
+
+<div align="center">
+
+### ⚡ LIVE ON SOLANA DEVNET ⚡
+
+Both programs are **deployed and verified** on Solana Devnet.
+
+| Program | Program ID | Explorer |
+|:--------|:-----------|:---------|
+| **sss-token** | `2D8s3bH6vD3LG7wqzvpSvYFysYoSK4wwggHCptaKFJJQ` | [View on Explorer →](https://explorer.solana.com/address/2D8s3bH6vD3LG7wqzvpSvYFysYoSK4wwggHCptaKFJJQ?cluster=devnet) |
+| **sss-transfer-hook** | `F2of7agMFET8v3verXe3e6Hmfd71t833RjPxEjs5wRdd` | [View on Explorer →](https://explorer.solana.com/address/F2of7agMFET8v3verXe3e6Hmfd71t833RjPxEjs5wRdd?cluster=devnet) |
+
+**Deploy Transactions**
+
+| Program | Signature |
+|:--------|:----------|
+| sss-token | [`3Tt9GZ...iantv`](https://explorer.solana.com/tx/3Tt9GZ4fEVP9PCNyhPe8pcKGnBdgHWWBD4QCUSWCoErr6oU3tqyCtLdQMBJLVgHeV1psZDvfFEi7zKmjcA5iantv?cluster=devnet) |
+| sss-transfer-hook | [`3PGnJB...mhZ`](https://explorer.solana.com/tx/3PGnJByDkNPuZNK46THdx6F1454Dfa1dxMBS8tjDQVW2eD1vtmyTP6GxDMJgrEY9HzEdg4dPjXSQDBL5gAT5mhZ?cluster=devnet) |
+
+> **Deployer:** `FcZ68m3SNkRWMiKMmLowKg3zwTHYdSvisTW4hTLR1BKQ` &nbsp;|&nbsp; **Network:** Devnet &nbsp;|&nbsp; **Upgrade Authority:** Retained
+
+</div>
+
+---
+
 ## Architecture
 
 Three-layer design:
